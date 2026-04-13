@@ -1,0 +1,56 @@
+# 🔐 Environment variables
+
+.env
+.env.*
+
+# 🔥 Firebase secret keys (IMPORTANT)
+
+firebase-key.json
+
+*.pem
+*.key
+serviceAccountKey.json
+
+# 🐍 Python
+
+**pycache**/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env/
+*.sqlite3
+
+# 📦 Node.js
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+firebase_config.js
+# ⚡ Vite / Build
+
+dist/
+build/
+
+# 🧪 Logs
+
+logs/
+*.log
+
+# 🖥️ OS files
+
+.DS_Store
+Thumbs.db
+
+# 🧰 IDE / Editor
+
+.vscode/
+.idea/
+
+# 📁 Misc
+
+*.zip
+*.tar
+*.gz
