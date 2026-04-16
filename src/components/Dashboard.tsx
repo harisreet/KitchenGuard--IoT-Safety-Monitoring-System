@@ -11,7 +11,8 @@ export function Dashboard() {
   const tempData = history.map((reading) => ({
     time: new Date(reading.timestamp).toLocaleTimeString('en-US', { 
       hour: '2-digit', 
-      minute: '2-digit' 
+      minute: '2-digit',
+      second: '2-digit'
     }),
     value: reading.temperature,
   }));
@@ -19,7 +20,8 @@ export function Dashboard() {
   const gasData = history.map((reading) => ({
     time: new Date(reading.timestamp).toLocaleTimeString('en-US', { 
       hour: '2-digit', 
-      minute: '2-digit' 
+      minute: '2-digit',
+      second: '2-digit'
     }),
     value: reading.gasLevel,
   }));
@@ -27,7 +29,8 @@ export function Dashboard() {
   const whistleData = history.map((reading) => ({
     time: new Date(reading.timestamp).toLocaleTimeString('en-US', { 
       hour: '2-digit', 
-      minute: '2-digit' 
+      minute: '2-digit',
+      second: '2-digit'
     }),
     value: reading.whistleCount,
   }));

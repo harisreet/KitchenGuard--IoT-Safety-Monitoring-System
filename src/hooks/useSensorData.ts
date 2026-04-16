@@ -1,4 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { ref, onValue } from 'firebase/database';
+import { database } from '../firebase';
+import { useSettings } from './useSettings';
 
 export interface SensorReading {
   timestamp: number;
@@ -25,9 +28,12 @@ export interface SensorStatus {
 }
 
 export function useSensorData() {
+  const { settings } = useSettings();
+  const settingsRefHook = useRef(settings);
+
   const [currentData, setCurrentData] = useState<SensorStatus>({
     temperature: {
-      current: 25,
+      current: 0,
       status: 'normal',
       unit: '°C',
     },
@@ -43,61 +49,111 @@ export function useSensorData() {
   });
 
   const [history, setHistory] = useState<SensorReading[]>([]);
+  const currentDataRef = useRef(currentData);
+
+  // Sync settings to ref for callbacks
+  useEffect(() => {
+    settingsRefHook.current = settings;
+  }, [settings]);
+
+  // Sync currentData to ref for use in setInterval without triggering effect recreation
+  useEffect(() => {
+    currentDataRef.current = currentData;
+  }, [currentData]);
 
   useEffect(() => {
-    // Initialize with some historical data
+    const kitchenRef = ref(database, 'smart_kitchen');
+    const unsubscribeKitchen = onValue(kitchenRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setCurrentData((prev) => {
+          const currentSettings = settingsRefHook.current;
+          const newTemp = data.temperature ?? prev.temperature.current;
+          const newGas = data.gas_level ?? prev.gas.current;
+
+          return {
+            ...prev,
+            temperature: {
+              ...prev.temperature,
+              current: newTemp,
+              status: newTemp > currentSettings.tempCritical ? 'critical' : newTemp > currentSettings.tempWarning ? 'warning' : 'normal',
+            },
+            gas: {
+              ...prev.gas,
+              current: newGas,
+              status: newGas > currentSettings.gasCritical ? 'critical' : newGas > currentSettings.gasWarning ? 'warning' : 'normal',
+            },
+          };
+        });
+      }
+    });
+
+    const sensorRef = ref(database, 'sensor');
+    const unsubscribeSensor = onValue(sensorRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setCurrentData((prev) => {
+          // If whistle isn't available, check sound. The mock was a cumulative count. 
+          // Let's use sound level from DB as it fluctuates but whistle seems to always be 0. 
+          // Actually, if whistle counts whistles, we only increment if whistle > 0? Let's just track data.whistle.
+          const newWhistleCount = (data.whistle !== undefined) ? data.whistle : prev.sound.whistleCount;
+          
+          let lastDetected = prev.sound.lastDetected;
+          if (newWhistleCount > prev.sound.whistleCount) {
+             lastDetected = Date.now();
+          }
+
+          return {
+            ...prev,
+            sound: {
+              whistleCount: newWhistleCount,
+              lastDetected,
+            }
+          };
+        });
+      }
+    });
+
+    return () => {
+      unsubscribeKitchen();
+      unsubscribeSensor();
+    };
+  }, []);
+
+  // Generate initial history once
+  useEffect(() => {
     const now = Date.now();
     const initialHistory: SensorReading[] = [];
     for (let i = 30; i >= 0; i--) {
-      initialHistory.push({
-        timestamp: now - i * 60000, // 1 minute intervals
-        temperature: 20 + Math.random() * 10,
-        gasLevel: Math.random() * 50,
-        whistleCount: Math.floor(Math.random() * 3),
-      });
+        initialHistory.push({
+            timestamp: now - i * 3000,
+            temperature: 0,
+            gasLevel: 0,
+            whistleCount: 0,
+        });
     }
     setHistory(initialHistory);
+  }, []);
 
-    // Simulate real-time sensor updates
+  // Poll current data into history for real-time charting
+  useEffect(() => {
     const interval = setInterval(() => {
-      const newTemp = 20 + Math.random() * 30;
-      const newGas = Math.random() * 200;
-      const whistleDetected = Math.random() > 0.95; // 5% chance of whistle
-
-      setCurrentData((prev) => {
-        const newWhistleCount = whistleDetected ? prev.sound.whistleCount + 1 : prev.sound.whistleCount;
-        
-        return {
-          temperature: {
-            current: newTemp,
-            status: newTemp > 40 ? 'critical' : newTemp > 30 ? 'warning' : 'normal',
-            unit: '°C',
-          },
-          gas: {
-            current: newGas,
-            status: newGas > 100 ? 'critical' : newGas > 50 ? 'warning' : 'normal',
-            unit: 'ppm',
-          },
-          sound: {
-            whistleCount: newWhistleCount,
-            lastDetected: whistleDetected ? Date.now() : prev.sound.lastDetected,
-          },
-        };
-      });
-
+      const liveData = currentDataRef.current;
       setHistory((prev) => {
+        if (prev.length === 0) return prev;
+        
         const newReading: SensorReading = {
           timestamp: Date.now(),
-          temperature: newTemp,
-          gasLevel: newGas,
-          whistleCount: whistleDetected ? 1 : 0,
+          temperature: liveData.temperature.current,
+          gasLevel: liveData.gas.current,
+          whistleCount: liveData.sound.whistleCount,
         };
         return [...prev.slice(-29), newReading]; // Keep last 30 readings
       });
-    }, 3000); // Update every 3 seconds
+    }, settings.refreshInterval * 1000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [settings.refreshInterval]);
 
   return { currentData, history };
 }

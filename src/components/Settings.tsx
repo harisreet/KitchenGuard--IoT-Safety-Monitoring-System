@@ -1,23 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Bell, Save, RefreshCw } from 'lucide-react';
 import { motion } from 'motion/react';
+import { useSettings } from '../hooks/useSettings';
 
 export function Settings() {
-  const [settings, setSettings] = useState({
-    tempWarning: 30,
-    tempCritical: 40,
-    gasWarning: 50,
-    gasCritical: 100,
-    soundEnabled: true,
-    emailNotifications: true,
-    smsNotifications: false,
-    refreshInterval: 3,
-  });
-
+  const { settings: globalSettings, saveSettings, loading } = useSettings();
+  
+  const [settings, setSettings] = useState(globalSettings);
   const [saved, setSaved] = useState(false);
 
-  const handleSave = () => {
-    // In a real app, this would save to backend
+  useEffect(() => {
+    if (!loading) {
+      setSettings(globalSettings);
+    }
+  }, [globalSettings, loading]);
+
+  const handleSave = async () => {
+    await saveSettings(settings);
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
   };
