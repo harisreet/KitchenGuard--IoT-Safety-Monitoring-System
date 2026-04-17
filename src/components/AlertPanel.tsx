@@ -40,6 +40,14 @@ export function AlertPanel({ currentData }: AlertPanelProps) {
     });
   }
 
+  if (currentData.alerts?.cooker) {
+    alerts.push({
+      id: `cooker-${currentData.alerts.cooker.timestamp}`,
+      type: 'warning',
+      message: `Cooker Alert: ${currentData.alerts.cooker.message}. Whistle count reached ${currentData.alerts.cooker.whistleCount}. (Recorded: ${currentData.alerts.cooker.timestamp})`,
+    });
+  }
+
   const activeAlerts = alerts.filter(alert => !dismissed.has(alert.id));
 
   if (activeAlerts.length === 0) return null;

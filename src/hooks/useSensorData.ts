@@ -25,6 +25,17 @@ export interface SensorStatus {
     whistleCount: number;
     lastDetected: number | null;
   };
+  alerts?: {
+    cooker?: {
+      message: string;
+      timestamp: string;
+      whistleCount: number;
+    };
+    gas?: {
+      message: string;
+      timestamp: string;
+    };
+  };
 }
 
 export function useSensorData() {
@@ -46,6 +57,7 @@ export function useSensorData() {
       whistleCount: 0,
       lastDetected: null,
     },
+    alerts: undefined,
   });
 
   const [history, setHistory] = useState<SensorReading[]>([]);
@@ -62,6 +74,24 @@ export function useSensorData() {
   }, [currentData]);
 
   useEffect(() => {
+    const alertRef = ref(database, 'alert');
+    const unsubscribeAlert = onValue(alertRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setCurrentData((prev) => {
+          const alertWhistle = data.cooker?.whistleCount || 0;
+          return {
+            ...prev,
+            alerts: data,
+            sound: {
+              ...prev.sound,
+              whistleCount: Math.max(prev.sound.whistleCount, alertWhistle)
+            }
+          };
+        });
+      }
+    });
+
     const kitchenRef = ref(database, 'smart_kitchen');
     const unsubscribeKitchen = onValue(kitchenRef, (snapshot) => {
       const data = snapshot.val();
@@ -95,8 +125,10 @@ export function useSensorData() {
         setCurrentData((prev) => {
           // If whistle isn't available, check sound. The mock was a cumulative count. 
           // Let's use sound level from DB as it fluctuates but whistle seems to always be 0. 
-          // Actually, if whistle counts whistles, we only increment if whistle > 0? Let's just track data.whistle.
-          const newWhistleCount = (data.whistle !== undefined) ? data.whistle : prev.sound.whistleCount;
+          // Fetch whistle count from sensor data, but respect alert whistle count if it's higher
+          const sensorWhistle = data.whistle !== undefined ? data.whistle : 0;
+          const alertWhistle = prev.alerts?.cooker?.whistleCount || 0;
+          const newWhistleCount = Math.max(sensorWhistle, alertWhistle);
           
           let lastDetected = prev.sound.lastDetected;
           if (newWhistleCount > prev.sound.whistleCount) {
@@ -117,6 +149,7 @@ export function useSensorData() {
     return () => {
       unsubscribeKitchen();
       unsubscribeSensor();
+      unsubscribeAlert();
     };
   }, []);
 

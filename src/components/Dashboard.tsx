@@ -1,4 +1,5 @@
 import { useSensorData } from '../hooks/useSensorData';
+import { useEmailAlerts } from '../hooks/useEmailAlerts';
 import { SensorCard } from './SensorCard';
 import { AlertPanel } from './AlertPanel';
 import { MiniChart } from './MiniChart';
@@ -7,6 +8,7 @@ import { motion } from 'motion/react';
 
 export function Dashboard() {
   const { currentData, history } = useSensorData();
+  useEmailAlerts(currentData);
 
   const tempData = history.map((reading) => ({
     time: new Date(reading.timestamp).toLocaleTimeString('en-US', { 
